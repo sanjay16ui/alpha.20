@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, Check, Bot, Lock } from "lucide-react";
+import { QRCodeSVG } from 'qrcode.react';
+import { playWarningBeep, playSuccessChime } from '../utils/sounds.js';
 
 const COLORS = {
   void: "#03030A",
@@ -58,6 +60,151 @@ const DEFAULT_FINDINGS = [
     color: COLORS.green,
   },
 ];
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FEATURE 5 — RESULT ANIMATION (Shake + Confetti)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const ResultAnimation = ({ isFake, trigger }) => {
+  const [confetti, setConfetti] = useState([]);
+  const [shake, setShake] = useState(false);
+
+  useEffect(() => {
+    if (!trigger) return;
+    if (isFake) {
+      setShake(true);
+      setTimeout(() => setShake(false), 600);
+    } else {
+      const pieces = Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        color: ['#00E5FF', '#00FF88', '#7B2FFF', '#FFB800'][Math.floor(Math.random() * 4)],
+        size: Math.random() * 8 + 4,
+        duration: Math.random() * 2 + 2,
+        delay: Math.random() * 0.5,
+      }));
+      setConfetti(pieces);
+      setTimeout(() => setConfetti([]), 3000);
+    }
+  }, [trigger, isFake]);
+
+  return (
+    <>
+      {confetti.map(p => (
+        <div key={p.id} style={{
+          position: 'fixed',
+          top: 0,
+          left: `${p.x}%`,
+          width: `${p.size}px`,
+          height: `${p.size}px`,
+          borderRadius: '2px',
+          background: p.color,
+          animation: `confettiFall ${p.duration}s ${p.delay}s ease-in forwards`,
+          zIndex: 99998,
+          pointerEvents: 'none',
+        }} />
+      ))}
+      {shake && (
+        <style>{`.result-container-inner { animation: shakeResult 0.6s ease-out; }`}</style>
+      )}
+    </>
+  );
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// FEATURE 7 — FAKE NEWS CARD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const FakeNewsCard = ({ result }) => {
+  if (!result || (result.trust_score ?? 100) >= 50) return null;
+
+  const headlines = [
+    'BREAKING: Politician Caught In Secret Meeting',
+    'SHOCKING: Celebrity Confesses To Major Crime',
+    'EXCLUSIVE: CEO Orders Illegal Transfer',
+    'VIRAL: Leader Makes Controversial Statement',
+    'EXPOSED: Official Caught In Massive Scandal',
+  ];
+  const headline = headlines[Math.floor(Math.random() * headlines.length)];
+  const shares = (Math.random() * 3 + 0.5).toFixed(1);
+  const damage = Math.floor(Math.random() * 90 + 10);
+
+  return (
+    <div style={{
+      margin: '16px 0',
+      padding: '16px 20px',
+      background: 'rgba(255,45,85,0.05)',
+      border: '1px solid rgba(255,45,85,0.2)',
+      borderRadius: '10px',
+    }}>
+      <div style={{
+        fontFamily: 'Orbitron, monospace',
+        fontSize: '9px',
+        color: 'rgba(255,45,85,0.7)',
+        letterSpacing: '0.15em',
+        marginBottom: '10px',
+      }}>
+        ⚠ IF THIS FAKE WAS PUBLISHED UNDETECTED:
+      </div>
+      <div style={{
+        padding: '12px',
+        background: 'rgba(0,0,0,0.4)',
+        borderRadius: '6px',
+        marginBottom: '10px',
+        borderLeft: '3px solid #FF2D55',
+      }}>
+        <div style={{
+          fontFamily: 'Inter, sans-serif',
+          fontSize: '14px',
+          fontWeight: '700',
+          color: 'white',
+          marginBottom: '6px',
+        }}>{headline}</div>
+        <div style={{
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: '9px',
+          color: 'rgba(255,255,255,0.3)',
+        }}>Shared {shares}M times in 4 hours</div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+        {[
+          { label: 'VIRAL SPREAD', value: `${shares}M shares` },
+          { label: 'DAMAGE EST.', value: `₹${damage} Crore` },
+          { label: 'SAFEZY STATUS', value: '✓ BLOCKED' },
+        ].map((s, i) => (
+          <div key={i} style={{
+            padding: '8px',
+            background: 'rgba(255,255,255,0.03)',
+            borderRadius: '6px',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              fontFamily: 'Orbitron, monospace',
+              fontSize: '7px',
+              color: 'rgba(255,255,255,0.3)',
+              letterSpacing: '0.1em',
+            }}>{s.label}</div>
+            <div style={{
+              fontFamily: 'Orbitron, monospace',
+              fontSize: '11px',
+              color: i === 2 ? '#00FF88' : '#FF2D55',
+              marginTop: '4px',
+              fontWeight: '700',
+            }}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{
+        marginTop: '10px',
+        fontFamily: 'Inter, sans-serif',
+        fontSize: '11px',
+        color: 'rgba(0,255,136,0.8)',
+        textAlign: 'center',
+        fontStyle: 'italic',
+      }}>
+        "SAFEZY caught this before it could cause harm."
+      </div>
+    </div>
+  );
+};
 
 function deriveEngineScores(data) {
   const flags = new Set(data?.flags || []);
@@ -291,74 +438,73 @@ const ProofSection = ({ result }) => {
 
   const proofs = isFake
     ? [
-        {
-          icon: "💓",
-          title: "NO HEARTBEAT DETECTED",
-          proof:
-            "rPPG cardiovascular analysis found ZERO heart rate signal in facial tissue. Living humans always show 60-100 BPM. AI faces show flat signal.",
-          score: scores.blood_flow_rppg || 0,
-          critical: true,
-        },
-        {
-          icon: "🎵",
-          title: "VOICE FREQUENCY GAPS",
-          proof:
-            "Frequency gap detected at 4,200-7,800Hz. Neural TTS synthesis (ElevenLabs, etc.) cannot reproduce natural 4-8kHz overtones. Real voices are continuous.",
-          score: scores.voice_frequency || 0,
-          critical: true,
-        },
-        {
-          icon: "📷",
-          title: "NO CAMERA SIGNATURE",
-          proof:
-            "Zero EXIF metadata found. Every real camera embeds its make, model, GPS and settings. AI generated images have no camera because no camera took them.",
-          score: scores.metadata_forensics || 0,
-          critical: true,
-        },
-        {
-          icon: "👁",
-          title: "CORNEAL GEOMETRY VIOLATION",
-          proof:
-            "Eye reflections violate Snell's Law. In real scenes both eyes reflect the same light sources at consistent angles. AI renderers produce physically impossible reflections.",
-          score: scores.corneal_reflection || 0,
-          critical: false,
-        },
-        {
-          icon: "😶",
-          title: "FACE BOUNDARY ARTIFACTS",
-          proof:
-            "Warping detected at jawline and hairline. Face-swap AI creates blending zones where the synthetic face meets the original. 47 landmark analysis found 12 unstable points.",
-          score: scores.face_consistency || 0,
-          critical: false,
-        },
-      ]
+      {
+        icon: "💓",
+        title: "NO HEARTBEAT DETECTED",
+        proof:
+          "rPPG cardiovascular analysis found ZERO heart rate signal in facial tissue. Living humans always show 60-100 BPM. AI faces show flat signal.",
+        score: scores.blood_flow_rppg || 0,
+        critical: true,
+      },
+      {
+        icon: "🎵",
+        title: "VOICE FREQUENCY GAPS",
+        proof:
+          "Frequency gap detected at 4,200-7,800Hz. Neural TTS synthesis (ElevenLabs, etc.) cannot reproduce natural 4-8kHz overtones. Real voices are continuous.",
+        score: scores.voice_frequency || 0,
+        critical: true,
+      },
+      {
+        icon: "📷",
+        title: "NO CAMERA SIGNATURE",
+        proof:
+          "Zero EXIF metadata found. Every real camera embeds its make, model, GPS and settings. AI generated images have no camera because no camera took them.",
+        score: scores.metadata_forensics || 0,
+        critical: true,
+      },
+      {
+        icon: "👁",
+        title: "CORNEAL GEOMETRY VIOLATION",
+        proof:
+          "Eye reflections violate Snell's Law. In real scenes both eyes reflect the same light sources at consistent angles. AI renderers produce physically impossible reflections.",
+        score: scores.corneal_reflection || 0,
+        critical: false,
+      },
+      {
+        icon: "😶",
+        title: "FACE BOUNDARY ARTIFACTS",
+        proof:
+          "Warping detected at jawline and hairline. Face-swap AI creates blending zones where the synthetic face meets the original. 47 landmark analysis found 12 unstable points.",
+        score: scores.face_consistency || 0,
+        critical: false,
+      },
+    ]
     : [
-        {
-          icon: "💓",
-          title: "HEARTBEAT CONFIRMED",
-          proof: `Cardiovascular signal detected at ${
-            60 + Math.floor(Math.random() * 25)
+      {
+        icon: "💓",
+        title: "HEARTBEAT CONFIRMED",
+        proof: `Cardiovascular signal detected at ${60 + Math.floor(Math.random() * 25)
           } BPM. This rhythmic signal in facial tissue is present in 100% of living humans and absent in all AI faces.`,
-          score: scores.blood_flow_rppg || 0,
-          critical: false,
-        },
-        {
-          icon: "🎵",
-          title: "NATURAL VOICE SPECTRUM",
-          proof:
-            "Full 0-8000Hz spectrum present with no gaps. Human voices produce continuous overtones across all frequencies. No synthetic gaps detected.",
-          score: scores.voice_frequency || 0,
-          critical: false,
-        },
-        {
-          icon: "📷",
-          title: "CAMERA SIGNATURE VERIFIED",
-          proof:
-            "Device metadata intact and consistent. Camera model, timestamp and settings all present. Content traces to a real physical camera capture.",
-          score: scores.metadata_forensics || 0,
-          critical: false,
-        },
-      ];
+        score: scores.blood_flow_rppg || 0,
+        critical: false,
+      },
+      {
+        icon: "🎵",
+        title: "NATURAL VOICE SPECTRUM",
+        proof:
+          "Full 0-8000Hz spectrum present with no gaps. Human voices produce continuous overtones across all frequencies. No synthetic gaps detected.",
+        score: scores.voice_frequency || 0,
+        critical: false,
+      },
+      {
+        icon: "📷",
+        title: "CAMERA SIGNATURE VERIFIED",
+        proof:
+          "Device metadata intact and consistent. Camera model, timestamp and settings all present. Content traces to a real physical camera capture.",
+        score: scores.metadata_forensics || 0,
+        critical: false,
+      },
+    ];
 
   return (
     <div style={{ marginTop: "32px" }}>
@@ -660,9 +806,8 @@ Section 65B. CERT-In registered system.
       style={{
         marginTop: "32px",
         padding: "24px",
-        border: `1px solid ${
-          isFake ? "rgba(255,45,85,0.3)" : "rgba(0,255,136,0.3)"
-        }`,
+        border: `1px solid ${isFake ? "rgba(255,45,85,0.3)" : "rgba(0,255,136,0.3)"
+          }`,
         borderRadius: "12px",
         background: isFake ? "rgba(255,45,85,0.05)" : "rgba(0,255,136,0.05)",
         position: "relative",
@@ -1003,6 +1148,33 @@ Section 65B. CERT-In registered system.
         >
           verify.safezy.io/{certId} | RFC 3161 Anchored | IT Act 2000 Compliant
         </div>
+
+        {/* Feature 6 — QR Code */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '12px',
+          background: 'white',
+          borderRadius: '8px',
+          width: 'fit-content',
+          margin: '12px auto 0',
+        }}>
+          <QRCodeSVG
+            value={`https://verify.safezy.io/${certId}`}
+            size={80}
+            bgColor="#ffffff"
+            fgColor="#000000"
+            level="M"
+          />
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: '7px',
+            color: '#333',
+            textAlign: 'center',
+          }}>Scan to verify</div>
+        </div>
       </div>
 
       {/* Download buttons */}
@@ -1320,11 +1492,13 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
   const [entryDone, setEntryDone] = useState(false);
   const [activeTab, setActiveTab] = useState("ai");
   const [copied, setCopied] = useState(false);
+  const [animTrigger, setAnimTrigger] = useState(0);
   const shareRef = useRef(null);
   const score = data?.trust_score ?? 23;
   const verdict = (data?.verdict ?? "High Risk").toLowerCase();
   const isHighRisk = score < 60;
   const isVerified = score > 70;
+  const isFake = score < 50;
   const verdictBg =
     score < 50
       ? "radial-gradient(ellipse at top, rgba(255,45,85,0.08) 0%, transparent 60%)"
@@ -1350,14 +1524,15 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
 
   useEffect(() => {
     if (isHighRisk) {
-      const t = setTimeout(() => setEntryDone(true), 800);
+      const t = setTimeout(() => { setEntryDone(true); setAnimTrigger(n => n + 1); }, 800);
       return () => clearTimeout(t);
     }
     if (isVerified) {
-      const t = setTimeout(() => setEntryDone(true), 400);
+      const t = setTimeout(() => { setEntryDone(true); setAnimTrigger(n => n + 1); }, 400);
       return () => clearTimeout(t);
     }
     setEntryDone(true);
+    setAnimTrigger(n => n + 1);
   }, [isHighRisk, isVerified]);
 
   const copyJson = () => {
@@ -1394,6 +1569,9 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
 
   return (
     <>
+      {/* Feature 5 — Result animation */}
+      <ResultAnimation isFake={isFake} trigger={animTrigger} />
+
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         .verdict-border-pulse { animation: verdict-pulse 2s ease-in-out infinite; }
@@ -1519,9 +1697,8 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
                   color: "rgba(148,163,184,0.9)",
                 }}
               >
-                {`${(data?.file_info?.file_type || "media").toUpperCase()} · ${
-                  verdict === "high risk" ? "AI GENERATED" : "HUMAN VERIFIED"
-                }`}
+                {`${(data?.file_info?.file_type || "media").toUpperCase()} · ${verdict === "high risk" ? "AI GENERATED" : "HUMAN VERIFIED"
+                  }`}
               </div>
               <div
                 style={{
@@ -1607,8 +1784,8 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
                         (i + score) % 3 === 0
                           ? "#E5E7EB"
                           : (i + score) % 4 === 0
-                          ? "#0F172A"
-                          : "#020617",
+                            ? "#0F172A"
+                            : "#020617",
                     }}
                   />
                 ))}
@@ -1703,8 +1880,8 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
                               e.value < 40
                                 ? "#EF4444"
                                 : e.value < 70
-                                ? "#F59E0B"
-                                : "#22C55E",
+                                  ? "#F59E0B"
+                                  : "#22C55E",
                             boxShadow: "0 0 10px rgba(34,197,94,0.6)",
                           }}
                         />
@@ -1855,10 +2032,9 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
               }}
             >
               {score < 50
-                ? `${
-                    9 -
-                    Object.values(data?.engine_scores || {}).filter((s) => s > 70).length
-                  } of 9 forensic engines flagged synthetic signals`
+                ? `${9 -
+                Object.values(data?.engine_scores || {}).filter((s) => s > 70).length
+                } of 9 forensic engines flagged synthetic signals`
                 : "All 9 forensic engines confirmed authentic human signals"}
             </div>
           </div>
@@ -2268,6 +2444,8 @@ export default function ResultsPage({ data, onOpenChat, onGenerateCertificate })
         </div>
 
         <ProofSection result={data} />
+        {/* Feature 7 — Fake News Card (only when AI detected) */}
+        <FakeNewsCard result={data} />
         <BeforeAfterComparison result={data} />
         <CertificateSection result={data} />
       </motion.div>

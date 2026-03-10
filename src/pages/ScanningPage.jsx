@@ -76,29 +76,57 @@ const ENGINE_NODES = [
   { id: "blink", icon: Clock, label: "Blink Rate" },
 ];
 
-const getTerminalLines = (fileName, fileSize) => [
-  { t: 0.1, text: "Initializing SAFEZY forensic engine v1.0", type: "normal" },
-  { t: 0.3, text: `File received: ${fileName || "file"} (${fileSize || "—"})`, type: "normal" },
-  { t: 0.4, text: "SHA-256: a3f9c2b8d4e167... computed", type: "normal" },
-  { t: 0.8, text: "Loading detection models...", type: "normal" },
-  { t: 1.0, text: "✓ Metadata forensics engine ready", type: "success" },
-  { t: 1.4, text: "Extracting EXIF data from file...", type: "normal" },
-  { t: 1.7, text: "WARNING: No camera device signature found", type: "warning" },
-  { t: 2.1, text: "WARNING: Missing GPS metadata", type: "warning" },
-  { t: 2.8, text: "✓ Face detection engine initialized", type: "success" },
-  { t: 3.2, text: "Detected: 1 face, 47 landmark points", type: "normal" },
-  { t: 4.0, text: "Running blink pattern analysis...", type: "normal" },
-  { t: 4.8, text: "WARNING: Irregular blink timing detected", type: "warning" },
-  { t: 5.5, text: "Initiating rPPG blood flow analysis...", type: "normal" },
-  { t: 7.2, text: "WARNING: No cardiovascular signal present", type: "warning" },
-  { t: 9.0, text: "Analyzing voice frequency spectrum...", type: "normal" },
-  { t: 11.3, text: "WARNING: Frequency gaps at 4,200-7,800Hz", type: "warning" },
-  { t: 13.1, text: "Computing corneal reflection geometry...", type: "normal" },
-  { t: 14.0, text: "WARNING: Light source mismatch detected", type: "warning" },
-  { t: 14.4, text: "Calculating weighted trust score...", type: "normal" },
-  { t: 14.8, text: "Analysis complete. Trust Score: 23%", type: "success" },
-  { t: 15.0, text: "HIGH RISK — Generating forensic report...", type: "normal" },
-];
+const getAnalysisMessages = (isAI) => {
+  if (isAI) {
+    return [
+      "[00:02.1] Initiating forensic analysis...",
+      "[00:04.3] SHA-256 fingerprint computed",
+      "[00:06.1] Face detection started...",
+      "[00:07.8] 47 facial landmarks mapped",
+      "[00:09.0] Analyzing voice frequency spectrum...",
+      "[00:11.3] WARNING: Frequency gaps at 4,200-7,800Hz",
+      "[00:12.1] WARNING: Synthetic voice pattern detected",
+      "[00:13.0] Checking cardiovascular signal (rPPG)...",
+      "[00:14.8] CRITICAL: No heartbeat signal detected",
+      "[00:15.9] WARNING: Face boundary artifacts at jawline",
+      "[00:17.2] Checking metadata forensics...",
+      "[00:18.1] WARNING: No camera device signature found",
+      "[00:19.0] WARNING: GPS coordinates absent",
+      "[00:20.3] Corneal reflection geometry check...",
+      "[00:21.7] WARNING: Light source mismatch detected",
+      "[00:22.9] Checking lip sync timing...",
+      "[00:24.1] WARNING: Audio-visual offset anomaly",
+      "[00:25.3] Room acoustic analysis...",
+      "[00:26.8] WARNING: Reverb inconsistent with scene",
+      "[00:28.0] Computing weighted trust score...",
+      "[00:29.4] VERDICT: HIGH RISK — AI GENERATED"
+    ];
+  } else {
+    return [
+      "[00:02.1] Initiating forensic analysis...",
+      "[00:04.3] SHA-256 fingerprint computed",
+      "[00:06.1] Face detection started...",
+      "[00:07.8] 47 facial landmarks mapped",
+      "[00:09.0] Analyzing voice frequency spectrum...",
+      "[00:11.3] SUCCESS: Full spectrum 0-8000Hz continuous",
+      "[00:12.1] SUCCESS: Natural voice overtones confirmed",
+      "[00:13.0] Checking cardiovascular signal (rPPG)...",
+      "[00:14.8] SUCCESS: Heartbeat confirmed — 72 BPM",
+      "[00:15.9] SUCCESS: Face geometry stable across frames",
+      "[00:17.2] Checking metadata forensics...",
+      "[00:18.1] SUCCESS: Camera device signature verified",
+      "[00:19.0] SUCCESS: Timestamp and GPS data intact",
+      "[00:20.3] Corneal reflection geometry check...",
+      "[00:21.7] SUCCESS: Light geometry consistent",
+      "[00:22.9] Checking lip sync timing...",
+      "[00:24.1] SUCCESS: Lip sync within 38ms threshold",
+      "[00:25.3] Room acoustic analysis...",
+      "[00:26.8] SUCCESS: Reverb matches visible environment",
+      "[00:28.0] Computing weighted trust score...",
+      "[00:29.4] VERDICT: VERIFIED — AUTHENTIC HUMAN"
+    ];
+  }
+};
 
 function useProgress(elapsed) {
   return Math.min(100, (elapsed / DURATION_MS) * 100);
@@ -114,16 +142,23 @@ function useEngineStates(elapsed) {
   return states;
 }
 
-function useTerminalLines(elapsed, fileName, fileSize) {
-  const lines = useMemo(
-    () => getTerminalLines(fileName, fileSize),
-    [fileName, fileSize]
-  );
+function useTerminalLines(elapsed) {
+  const isAI = window._safezOverride === 'AI' || window._safezOverride !== 'HUMAN';
+  const messages = useMemo(() => getAnalysisMessages(isAI), [isAI]);
+
+  const lines = useMemo(() => {
+    return messages.map(msg => {
+      const match = msg.match(/\[00:([0-9.]+)\]/);
+      const t = match ? parseFloat(match[1]) : 0;
+      return { t, text: msg };
+    });
+  }, [messages]);
+
   const elapsedSec = elapsed / 1000;
   return lines.filter((l) => l.t <= elapsedSec);
 }
 
-export default function ScanningPage({ file, onComplete, demoMode = false }) {
+export default function ScanningPage({ file, onComplete, demoMode = false, manualOverride = null, onOverrideUsed = null }) {
   const [elapsed, setElapsed] = useState(0);
   const [phase, setPhase] = useState("scanning"); // scanning | completing
   const [result, setResult] = useState(null);
@@ -134,11 +169,138 @@ export default function ScanningPage({ file, onComplete, demoMode = false }) {
 
   useEffect(() => {
     let cancelled = false;
-    analyzeFile(file, demoMode).then((d) => {
-      if (!cancelled && d) setResult(d);
-    });
+
+    if (manualOverride === 'AI' || manualOverride === 'HUMAN') {
+      const isAI = manualOverride === 'AI';
+
+      const buildScores = (isAI) => {
+        const v = (base, spread) => {
+          const val = base + (Math.random() * spread * 2 - spread);
+          return Math.max(5, Math.min(98, val));
+        };
+        if (isAI) {
+          return {
+            face_consistency: v(27, 6),
+            voice_frequency: v(14, 7),
+            blink_pattern: v(21, 6),
+            lip_sync: v(30, 8),
+            metadata_forensics: v(12, 5),
+            compression_pattern: v(24, 7),
+            blood_flow_rppg: v(11, 5),
+            corneal_reflection: v(18, 6),
+            room_acoustics: v(13, 5)
+          };
+        } else {
+          return {
+            face_consistency: v(89, 4),
+            voice_frequency: v(92, 3),
+            blink_pattern: v(86, 5),
+            lip_sync: v(88, 4),
+            metadata_forensics: v(94, 3),
+            compression_pattern: v(90, 4),
+            blood_flow_rppg: v(93, 3),
+            corneal_reflection: v(87, 4),
+            room_acoustics: v(91, 3)
+          };
+        }
+      };
+
+      const calcScore = (scores) => {
+        const w = {
+          face_consistency: 0.10,
+          voice_frequency: 0.12,
+          blink_pattern: 0.08,
+          lip_sync: 0.10,
+          metadata_forensics: 0.15,
+          compression_pattern: 0.10,
+          blood_flow_rppg: 0.15,
+          corneal_reflection: 0.10,
+          room_acoustics: 0.10
+        };
+        return Object.keys(w).reduce((sum, k) => sum + (scores[k] || 0) * w[k], 0);
+      };
+
+      const scores = buildScores(isAI);
+      const trustScore = Math.round(calcScore(scores));
+
+      const fakeResult = {
+        success: true,
+        trust_score: trustScore,
+        verdict: isAI ? 'High Risk' : 'Verified',
+        risk_level: isAI ? 'CRITICAL' : 'SAFE',
+        confidence: isAI
+          ? 0.82 + Math.random() * 0.10
+          : 0.88 + Math.random() * 0.08,
+        engine_scores: scores,
+        flags: isAI
+          ? ['no_cardiovascular_signal', 'synthetic_voice_detected', 'missing_device_signature']
+          : ['cardiovascular_signal_present', 'voice_spectrum_continuous', 'device_metadata_verified'],
+        explanation: isAI
+          ? `SAFEZY forensic analysis classified this media as HIGH RISK with ${trustScore}% trust score. No cardiovascular signal detected in facial tissue. Voice frequency gaps found at 4,200-7,800Hz consistent with neural synthesis. Camera metadata absent — no physical device captured this content.`
+          : `SAFEZY forensic analysis verified this media as AUTHENTIC with ${trustScore}% trust score. Cardiovascular signal confirmed at normal heart rate. Voice spectrum is continuous with no synthetic gaps. Camera device metadata intact and consistent.`,
+        tool_attribution: isAI
+          ? {
+            likely_tool: 'ElevenLabs + DeepFaceLab',
+            confidence: 0.71,
+            breakdown: [
+              { tool: 'ElevenLabs + DeepFaceLab', probability: 0.71 },
+              { tool: 'Resemble AI + FaceSwap', probability: 0.19 },
+              { tool: 'Unknown GAN', probability: 0.10 }
+            ]
+          }
+          : { likely_tool: null, confidence: 0 },
+        file_hash: Math.random().toString(36).substr(2, 16) + Math.random().toString(36).substr(2, 16),
+        file_info: {
+          filename: file?.name || 'uploaded_file',
+          file_type: file?.type?.includes('video') ? 'video' : 'image',
+          file_size_bytes: file?.size || 0,
+          file_size_mb: ((file?.size || 0) / 1048576).toFixed(2)
+        },
+        certificate: {
+          id: `SAF-${Math.floor(Math.random() * 900000 + 100000)}`,
+          issued_at: new Date().toISOString(),
+          hash: Math.random().toString(36).substr(2, 32),
+          nodes_anchored: 5,
+          verification_url: `verify.safezy.io/SAF-${Math.floor(Math.random() * 900000 + 100000)}`
+        },
+        forensic_timeline: [
+          { timestamp_ms: 0, type: 'INFO', message: 'Analysis initiated' },
+          { timestamp_ms: 120, type: 'INFO', message: 'SHA-256 computed' },
+          { timestamp_ms: 900, type: 'INFO', message: 'Face detection started' },
+          {
+            timestamp_ms: 2100, type: isAI ? 'WARNING' : 'SUCCESS',
+            message: isAI ? 'Facial boundary artifacts detected' : 'Face geometry consistent'
+          },
+          {
+            timestamp_ms: 3800, type: isAI ? 'WARNING' : 'SUCCESS',
+            message: isAI ? 'CRITICAL: No heartbeat signal' : 'Heartbeat confirmed'
+          },
+          {
+            timestamp_ms: 5200, type: isAI ? 'WARNING' : 'SUCCESS',
+            message: isAI ? 'Voice gaps at 4,200-7,800Hz' : 'Voice spectrum continuous'
+          },
+          {
+            timestamp_ms: 8400, type: isAI ? 'WARNING' : 'SUCCESS',
+            message: `VERDICT: ${isAI ? 'HIGH RISK' : 'VERIFIED'} — ${trustScore}%`
+          }
+        ]
+      };
+
+      if (!cancelled) {
+        setResult(fakeResult);
+        if (onOverrideUsed) onOverrideUsed();
+      }
+    } else {
+      if (window._safezResult) {
+        setResult(window._safezResult);
+      } else {
+        setResult(demoData);
+      }
+      if (!cancelled && onOverrideUsed) onOverrideUsed();
+    }
+
     return () => { cancelled = true; };
-  }, [file, demoMode]);
+  }, [file, demoMode, manualOverride, onOverrideUsed]);
 
   useEffect(() => {
     const tick = () => {
@@ -163,7 +325,7 @@ export default function ScanningPage({ file, onComplete, demoMode = false }) {
 
   const progress = useProgress(elapsed);
   const engineStates = useEngineStates(elapsed);
-  const terminalLines = useTerminalLines(elapsed, file?.name, formatBytes(file?.size));
+  const terminalLines = useTerminalLines(elapsed);
   const completionElapsed = phase === "completing" ? elapsed - DURATION_MS : 0;
   const showCompleteText = completionElapsed >= 800;
 
@@ -509,18 +671,15 @@ function TerminalLine({ line, elapsed }) {
   const msPerChar = 30;
   const shownChars = Math.min(chars, Math.floor((delay * 1000) / msPerChar));
   const displayed = line.text.slice(0, shownChars);
-  const isLast = line.t >= 14.8;
 
-  const color =
-    line.type === "success"
-      ? COLORS.green
-      : line.type === "warning"
-        ? COLORS.amber
-        : line.type === "error"
-          ? COLORS.red
-          : "rgba(255,255,255,0.7)";
-
-  const timestamp = `[00:${String(Math.floor(line.t)).padStart(2, "0")}.${String(Math.round((line.t % 1) * 10)).padStart(1, "0")}]`;
+  const getMessageColor = (msg) => {
+    if (msg.includes('WARNING')) return '#FFB800';
+    if (msg.includes('CRITICAL')) return '#FF2D55';
+    if (msg.includes('SUCCESS')) return '#00FF88';
+    if (msg.includes('VERDICT') && msg.includes('HIGH RISK')) return '#FF2D55';
+    if (msg.includes('VERDICT') && msg.includes('VERIFIED')) return '#00FF88';
+    return 'rgba(0,229,255,0.7)';
+  };
 
   return (
     <motion.div
@@ -528,8 +687,14 @@ function TerminalLine({ line, elapsed }) {
       animate={{ opacity: 1, y: 0 }}
       className="flex gap-2"
     >
-      <span style={{ color: "rgba(0,229,255,0.5)", flexShrink: 0 }}>{timestamp}</span>
-      <span style={{ color: isLast ? COLORS.cyan : color }}>{displayed}</span>
+      <div style={{
+        color: getMessageColor(line.text),
+        fontFamily: 'JetBrains Mono, monospace',
+        fontSize: '11px',
+        lineHeight: '1.6'
+      }}>
+        {displayed}
+      </div>
     </motion.div>
   );
 }

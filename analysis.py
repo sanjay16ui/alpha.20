@@ -64,11 +64,6 @@ def get_upload_number(session_id: str) -> int:
     return session_counter[session_id]
 
 
-def is_fake(upload_number: int) -> bool:
-    """Return True if this upload should be treated as fake (odd uploads)."""
-    return upload_number % 2 == 1
-
-
 def reset_session_state(session_id: str) -> None:
     """Reset upload counter and history for a session (for demo resets)."""
     if session_id in session_counter:

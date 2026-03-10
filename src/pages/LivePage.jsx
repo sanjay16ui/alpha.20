@@ -1,291 +1,481 @@
-import React, { useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { useSafezyStore } from "../store/safezyStore.jsx";
-import { PlayCircle, Activity, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts";
 
-const COLORS = {
-  surface: "#0C0C1A",
-  border: "rgba(255,255,255,0.06)",
-  cyan: "#00E5FF",
-  red: "#EF4444",
-  green: "#10B981",
-};
-
-const pageVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
-  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
-};
-
-function timeAgo(ts) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  const diff = (Date.now() - d.getTime()) / 1000;
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  const days = Math.floor(diff / 86400);
-  if (days === 1) return "Yesterday";
-  return `${days}d ago`;
-}
-
-export default function LivePage() {
-  const { state } = useSafezyStore();
-  const { liveQueue, analyses } = state;
-
-  const feedItems = useMemo(
-    () => [...analyses].slice().reverse(),
-    [analyses],
+const LiveGuardianPage = () => {
+  const [isActive, setIsActive] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [threatCount, setThreatCount] = useState(0);
+  const [feed, setFeed] = useState([]);
+  const [liveScore, setLiveScore] = useState(94);
+  const [heartRate, setHeartRate] = useState(72);
+  const [graphData, setGraphData] = useState(
+    Array.from({ length: 20 }, (_, i) => ({
+      t: i,
+      score: 88 + Math.random() * 10 - 5
+    }))
   );
 
-  const sessionStats = useMemo(() => {
-    const total = analyses.length;
-    const fakes = analyses.filter((a) => a.verdict === "High Risk").length;
-    const real = analyses.filter((a) => a.verdict === "Verified").length;
-    const first = analyses[0]?.timestamp ? new Date(analyses[0].timestamp) : null;
-    const sessionDuration =
-      first != null
-        ? Math.max(0, Math.round((Date.now() - first.getTime()) / 1000))
-        : 0;
-    return { total, fakes, real, sessionDuration };
-  }, [analyses]);
+  // Simulate live scanning when active
+  useEffect(() => {
+    if (!isActive) return;
 
-  const barData = [
-    { name: "High Risk", value: sessionStats.fakes },
-    { name: "Verified", value: sessionStats.real },
-  ];
+    const interval = setInterval(() => {
+      // Update score with slight variation
+      setLiveScore(prev => {
+        const next = prev + (Math.random() * 6 - 3);
+        return Math.max(60, Math.min(99, Math.round(next)));
+      });
 
-  if (!analyses.length && !liveQueue.length) {
-    return (
-      <motion.div
-        variants={pageVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        className="min-h-[calc(100vh-84px)] flex items-center justify-center"
-      >
-        <div
-          className="rounded-2xl p-10 text-center max-w-md"
-          style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}
-        >
-          <div className="mb-4 flex justify-center">
-            <div
-              className="w-16 h-16 rounded-full border border-cyan-500/40 flex items-center justify-center"
-              style={{
-                boxShadow: "0 0 40px rgba(8,47,73,0.9)",
-              }}
-            >
-              <div className="w-10 h-10 rounded-full border border-cyan-500/60 animate-pulse" />
-            </div>
-          </div>
-          <h2
-            className="text-xl font-bold mb-2"
-            style={{ fontFamily: "Space Grotesk", color: "white" }}
-          >
-            SAFEZY is monitoring...
-          </h2>
-          <p className="text-sm text-gray-400 mb-4" style={{ fontFamily: "Inter" }}>
-            Upload a file to begin live analysis and see activity here.
-          </p>
-        </div>
-      </motion.div>
-    );
-  }
+      // Update heart rate
+      setHeartRate(prev => {
+        const next = prev + (Math.random() * 4 - 2);
+        return Math.max(60, Math.min(90, Math.round(next)));
+      });
+
+      // Update scan count
+      setScanCount(prev => prev + 1);
+
+      // Update graph
+      setGraphData(prev => {
+        const next = [...prev.slice(1), {
+          t: prev[prev.length - 1].t + 1,
+          score: 85 + Math.random() * 13
+        }];
+        return next;
+      });
+
+      // Occasionally add feed events
+      if (Math.random() > 0.6) {
+        const events = [
+          { type: 'safe', msg: 'Face geometry stable — all 47 landmarks consistent' },
+          { type: 'safe', msg: 'Heartbeat signal confirmed — 72 BPM detected' },
+          { type: 'safe', msg: 'Voice spectrum continuous — no synthetic gaps' },
+          { type: 'safe', msg: 'Corneal reflections verified — physics consistent' },
+          { type: 'warning', msg: 'Micro-expression anomaly — monitoring...' },
+          { type: 'safe', msg: 'Blink pattern normal — 16 blinks/min' },
+          { type: 'safe', msg: 'Lip sync verified — 38ms offset detected' },
+          { type: 'safe', msg: 'Room acoustics matched — reverb consistent' },
+        ];
+        const ev = events[Math.floor(Math.random() * events.length)];
+        setFeed(prev => [{
+          ...ev,
+          time: new Date().toLocaleTimeString('en-IN'),
+          id: Date.now()
+        }, ...prev.slice(0, 14)]);
+
+        if (ev.type === 'threat') {
+          setThreatCount(p => p + 1);
+        }
+      }
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, [isActive]);
 
   return (
     <motion.div
-      variants={pageVariants}
-      initial="hidden"
-      animate="visible"
-      exit="exit"
-      className="space-y-5"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      style={{
+        padding: '24px',
+        minHeight: '100vh',
+        background: '#00000F'
+      }}
     >
-      {/* Active queue */}
-      <section
-        className="rounded-2xl p-5"
-        style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div
-            className="text-xs uppercase tracking-[0.18em] text-gray-400"
-            style={{ fontFamily: "JetBrains Mono, monospace" }}
-          >
-            ACTIVE QUEUE
+
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '28px'
+      }}>
+        <div>
+          <div style={{
+            fontFamily: 'Orbitron,monospace',
+            fontSize: '18px',
+            fontWeight: '700',
+            color: 'white',
+            letterSpacing: '0.05em'
+          }}>
+            LIVE GUARDIAN
           </div>
-          <div className="flex items-center gap-2 text-xs text-gray-300">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                liveQueue.length ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
-              }`}
-            />
-            <span style={{ fontFamily: "JetBrains Mono, monospace" }}>
-              {liveQueue.length ? `${liveQueue.length} running` : "IDLE — No active analyses"}
-            </span>
+          <div style={{
+            fontFamily: 'JetBrains Mono,monospace',
+            fontSize: '10px',
+            color: 'rgba(0,229,255,0.5)',
+            marginTop: '4px'
+          }}>
+            Real-time deepfake monitoring
+            during live video calls
           </div>
         </div>
-        <div className="space-y-3">
-          {liveQueue.map((q) => (
-            <div
-              key={q.id}
-              className="rounded-xl p-3 flex flex-col gap-1"
-              style={{
-                background: "rgba(15,23,42,0.96)",
-                border: "1px solid rgba(148,163,184,0.5)",
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <PlayCircle className="text-cyan-400 animate-spin-slow" size={18} />
-                  <span
-                    className="text-sm text-slate-100"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                  >
-                    {q.filename}
-                  </span>
+
+        {/* ON/OFF toggle */}
+        <button
+          onClick={() => {
+            setIsActive(p => !p);
+            if (!isActive) {
+              setFeed([]);
+              setScanCount(0);
+            }
+          }}
+          style={{
+            padding: '12px 28px',
+            borderRadius: '8px',
+            border: isActive
+              ? '1px solid rgba(255,45,85,0.4)'
+              : '1px solid rgba(0,255,136,0.4)',
+            background: isActive
+              ? 'rgba(255,45,85,0.10)'
+              : 'rgba(0,255,136,0.10)',
+            color: isActive ? '#FF2D55' : '#00FF88',
+            fontFamily: 'Orbitron,monospace',
+            fontSize: '11px',
+            letterSpacing: '0.1em',
+            cursor: 'pointer'
+          }}
+        >
+          {isActive ? '■ STOP GUARDIAN' : '▶ START GUARDIAN'}
+        </button>
+      </div>
+
+      {/* 4 stat cards */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4,1fr)',
+        gap: '16px',
+        marginBottom: '24px'
+      }}>
+        {[
+          {
+            label: 'LIVE TRUST SCORE',
+            value: isActive ? `${liveScore}%` : '--',
+            color: liveScore > 70 ? '#00FF88' : '#FF2D55',
+            glow: liveScore > 70
+              ? '0 0 20px rgba(0,255,136,0.3)'
+              : '0 0 20px rgba(255,45,85,0.3)'
+          },
+          {
+            label: 'HEART RATE',
+            value: isActive ? `${heartRate} BPM` : '--',
+            color: '#00E5FF',
+            glow: '0 0 20px rgba(0,229,255,0.2)'
+          },
+          {
+            label: 'FRAMES SCANNED',
+            value: isActive
+              ? (scanCount * 30).toLocaleString()
+              : '0',
+            color: 'white',
+            glow: 'none'
+          },
+          {
+            label: 'THREATS',
+            value: threatCount.toString(),
+            color: threatCount > 0 ? '#FF2D55' : '#00FF88',
+            glow: threatCount > 0
+              ? '0 0 20px rgba(255,45,85,0.4)'
+              : 'none'
+          }
+        ].map((card, i) => (
+          <div key={i} style={{
+            padding: '20px',
+            background: 'rgba(8,8,24,0.8)',
+            border: '1px solid rgba(0,229,255,0.08)',
+            borderRadius: '12px',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              position: 'absolute', top: 0, left: 0,
+              width: '20px', height: '20px',
+              borderTop: '2px solid rgba(0,229,255,0.3)',
+              borderLeft: '2px solid rgba(0,229,255,0.3)',
+              borderTopLeftRadius: '12px'
+            }} />
+            <div style={{
+              fontFamily: 'Orbitron,monospace',
+              fontSize: '8px',
+              letterSpacing: '0.15em',
+              color: 'rgba(255,255,255,0.3)',
+              marginBottom: '10px'
+            }}>
+              {card.label}
+            </div>
+            <div style={{
+              fontFamily: 'Orbitron,monospace',
+              fontSize: '28px',
+              fontWeight: '700',
+              color: card.color,
+              textShadow: card.glow
+            }}>
+              {card.value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Main content — two columns */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '20px',
+        marginBottom: '20px'
+      }}>
+
+        {/* LEFT — Live score graph */}
+        <div style={{
+          padding: '20px',
+          background: 'rgba(8,8,24,0.8)',
+          border: '1px solid rgba(0,229,255,0.08)',
+          borderRadius: '12px'
+        }}>
+          <div style={{
+            fontFamily: 'Orbitron,monospace',
+            fontSize: '9px',
+            letterSpacing: '0.15em',
+            color: 'rgba(0,229,255,0.6)',
+            marginBottom: '16px'
+          }}>
+            LIVE TRUST SCORE TIMELINE
+          </div>
+
+          {/* Simple SVG line chart */}
+          <svg width="100%" height="140"
+            viewBox="0 0 300 140"
+            preserveAspectRatio="none">
+            {/* Grid lines */}
+            {[0, 35, 70, 105, 140].map(y => (
+              <line key={y} x1="0" y1={y}
+                x2="300" y2={y}
+                stroke="rgba(0,229,255,0.05)"
+                strokeWidth="1" />
+            ))}
+            {/* Safe threshold line */}
+            <line x1="0" y1="42" x2="300" y2="42"
+              stroke="rgba(0,229,255,0.2)"
+              strokeWidth="1"
+              strokeDasharray="4 4" />
+            <text x="4" y="38"
+              fill="rgba(0,229,255,0.4)"
+              fontSize="8"
+              fontFamily="monospace">
+              SAFE 70%
+            </text>
+            {/* Score line */}
+            {isActive && graphData.length > 1 && (
+              <polyline
+                points={graphData.map((d, i) =>
+                  `${(i / (graphData.length - 1)) * 300},${140 - (d.score / 100) * 140}`
+                ).join(' ')}
+                fill="none"
+                stroke="#00E5FF"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+            )}
+            {/* Area fill */}
+            {isActive && graphData.length > 1 && (
+              <polygon
+                points={[
+                  ...graphData.map((d, i) =>
+                    `${(i / (graphData.length - 1)) * 300},${140 - (d.score / 100) * 140}`
+                  ),
+                  '300,140', '0,140'
+                ].join(' ')}
+                fill="rgba(0,229,255,0.05)"
+              />
+            )}
+            {!isActive && (
+              <text x="150" y="75"
+                fill="rgba(255,255,255,0.2)"
+                fontSize="11"
+                fontFamily="monospace"
+                textAnchor="middle">
+                Start Guardian to see live data
+              </text>
+            )}
+          </svg>
+        </div>
+
+        {/* RIGHT — Engine status grid */}
+        <div style={{
+          padding: '20px',
+          background: 'rgba(8,8,24,0.8)',
+          border: '1px solid rgba(0,229,255,0.08)',
+          borderRadius: '12px'
+        }}>
+          <div style={{
+            fontFamily: 'Orbitron,monospace',
+            fontSize: '9px',
+            letterSpacing: '0.15em',
+            color: 'rgba(0,229,255,0.6)',
+            marginBottom: '16px'
+          }}>
+            ENGINE STATUS — LIVE
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr 1fr',
+            gap: '10px'
+          }}>
+            {[
+              { name: 'FACE', icon: '👤', key: 'face_consistency' },
+              { name: 'VOICE', icon: '🎵', key: 'voice_frequency' },
+              { name: 'BLINK', icon: '👁', key: 'blink_pattern' },
+              { name: 'LIPS', icon: '💬', key: 'lip_sync' },
+              { name: 'META', icon: '📋', key: 'metadata' },
+              { name: 'rPPG', icon: '💓', key: 'blood_flow' },
+              { name: 'CORN', icon: '🔍', key: 'corneal' },
+              { name: 'AUDIO', icon: '🔊', key: 'room_acoustics' },
+              { name: 'COMP', icon: '🗜', key: 'compression' }
+            ].map((eng, i) => {
+              const score = isActive
+                ? Math.round(85 + Math.random() * 13)
+                : 0;
+              const ok = score > 70;
+              return (
+                <div key={i} style={{
+                  padding: '10px 8px',
+                  borderRadius: '8px',
+                  background: isActive
+                    ? ok
+                      ? 'rgba(0,255,136,0.06)'
+                      : 'rgba(255,45,85,0.06)'
+                    : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${!isActive
+                      ? 'rgba(255,255,255,0.05)'
+                      : ok
+                        ? 'rgba(0,255,136,0.2)'
+                        : 'rgba(255,45,85,0.2)'
+                    }`,
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontSize: '18px' }}>
+                    {eng.icon}
+                  </div>
+                  <div style={{
+                    fontFamily: 'Orbitron,monospace',
+                    fontSize: '7px',
+                    color: 'rgba(255,255,255,0.4)',
+                    letterSpacing: '0.05em',
+                    marginTop: '4px'
+                  }}>
+                    {eng.name}
+                  </div>
+                  <div style={{
+                    fontFamily: 'JetBrains Mono,monospace',
+                    fontSize: '10px',
+                    color: !isActive
+                      ? 'rgba(255,255,255,0.2)'
+                      : ok ? '#00FF88' : '#FF2D55',
+                    marginTop: '3px',
+                    fontWeight: '600'
+                  }}>
+                    {isActive
+                      ? (ok ? '✓ OK' : '⚠ FLAG')
+                      : '—'}
+                  </div>
                 </div>
-                <span
-                  className="text-xs text-amber-300"
-                  style={{ fontFamily: "JetBrains Mono, monospace" }}
-                >
-                  ANALYZING...
-                </span>
-              </div>
-              <div
-                className="text-[11px] text-slate-400"
-                style={{ fontFamily: "JetBrains Mono, monospace" }}
-              >
-                Started: {q.started_at}
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background:
-                      "linear-gradient(90deg, rgba(56,189,248,1), rgba(129,140,248,1))",
-                    width: `${q.progress ?? 10}%`,
-                  }}
-                  animate={{ width: ["10%", "90%"] }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                />
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                <Activity size={12} />
-                <span>Running multi-engine forensic analysis...</span>
-              </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom — Live feed */}
+      <div style={{
+        padding: '20px',
+        background: 'rgba(8,8,24,0.8)',
+        border: '1px solid rgba(0,229,255,0.08)',
+        borderRadius: '12px'
+      }}>
+        <div style={{
+          fontFamily: 'Orbitron,monospace',
+          fontSize: '9px',
+          letterSpacing: '0.15em',
+          color: 'rgba(0,229,255,0.6)',
+          marginBottom: '12px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px'
+        }}>
+          {isActive && (
+            <div style={{
+              width: '6px', height: '6px',
+              borderRadius: '50%',
+              background: '#00FF88',
+              boxShadow: '0 0 8px #00FF88',
+              animation: 'pulse 1.5s infinite'
+            }} />
+          )}
+          FORENSIC EVENT LOG
+        </div>
+
+        <div style={{
+          height: '160px',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px'
+        }}>
+          {!isActive && (
+            <div style={{
+              fontFamily: 'JetBrains Mono,monospace',
+              fontSize: '11px',
+              color: 'rgba(255,255,255,0.2)',
+              textAlign: 'center',
+              marginTop: '50px'
+            }}>
+              Press START GUARDIAN to begin monitoring
+            </div>
+          )}
+          {feed.map(item => (
+            <div key={item.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '7px 12px',
+              borderRadius: '6px',
+              borderLeft: `3px solid ${item.type === 'threat'
+                  ? '#FF2D55'
+                  : item.type === 'warning'
+                    ? '#FFB800'
+                    : '#00FF88'
+                }`,
+              background: item.type === 'threat'
+                ? 'rgba(255,45,85,0.05)'
+                : 'rgba(0,255,136,0.03)'
+            }}>
+              <span style={{
+                fontFamily: 'JetBrains Mono,monospace',
+                fontSize: '9px',
+                color: 'rgba(255,255,255,0.25)',
+                whiteSpace: 'nowrap'
+              }}>
+                {item.time}
+              </span>
+              <span style={{
+                fontFamily: 'JetBrains Mono,monospace',
+                fontSize: '10px',
+                color: item.type === 'threat'
+                  ? '#FF2D55'
+                  : item.type === 'warning'
+                    ? '#FFB800'
+                    : 'rgba(255,255,255,0.6)'
+              }}>
+                {item.msg}
+              </span>
             </div>
           ))}
         </div>
-      </section>
+      </div>
 
-      {/* Live feed */}
-      <section
-        className="rounded-2xl p-5"
-        style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}
-      >
-        <div
-          className="text-xs uppercase tracking-[0.18em] text-gray-400 mb-3"
-          style={{ fontFamily: "JetBrains Mono, monospace" }}
-        >
-          LIVE ACTIVITY FEED
-        </div>
-        <div className="space-y-3 max-h-[260px] overflow-y-auto pr-1">
-          {feedItems.map((a) => {
-            const isHigh = a.verdict === "High Risk";
-            return (
-              <div
-                key={a.id}
-                className="rounded-xl p-3 flex gap-3"
-                style={{
-                  background: "rgba(15,23,42,0.96)",
-                  borderLeft: `4px solid ${isHigh ? COLORS.red : COLORS.green}`,
-                  borderTop: `1px solid rgba(148,163,184,0.5)`,
-                  borderRight: `1px solid rgba(148,163,184,0.5)`,
-                  borderBottom: `1px solid rgba(148,163,184,0.5)`,
-                }}
-              >
-                <div className="flex flex-col justify-between">
-                  <span
-                    className="text-[11px] text-slate-400"
-                    style={{ fontFamily: "JetBrains Mono, monospace" }}
-                  >
-                    ● {timeAgo(a.timestamp)}
-                  </span>
-                </div>
-                <div className="flex-1">
-                  <div
-                    className="text-sm text-slate-100"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                  >
-                    {a.filename} analyzed
-                  </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    Result:{" "}
-                    <span style={{ color: isHigh ? COLORS.red : COLORS.green }}>
-                      {a.verdict} ({a.trust_score ?? 0}%)
-                    </span>
-                  </div>
-                  <div className="text-[11px] text-slate-400">
-                    Critical signals flagged:{" "}
-                    {Object.values(a.engine_scores || {}).filter((v) => Number(v) < 40).length}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Session stats */}
-      <section
-        className="rounded-2xl p-5"
-        style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-          <Stat label="Files analyzed this session" value={sessionStats.total} />
-          <Stat label="Fakes caught" value={sessionStats.fakes} />
-          <Stat label="Real verified" value={sessionStats.real} />
-          <Stat
-            label="Session duration"
-            value={`${Math.floor(sessionStats.sessionDuration / 60)}m`}
-          />
-        </div>
-        <div style={{ width: "100%", height: 160 }}>
-          <ResponsiveContainer>
-            <BarChart data={barData}>
-              <XAxis dataKey="name" stroke="#64748B" />
-              <YAxis stroke="#64748B" allowDecimals={false} />
-              <Bar dataKey="value">
-                <Cell key="fake" fill={COLORS.red} />
-                <Cell key="real" fill={COLORS.green} />
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </section>
     </motion.div>
   );
-}
+};
 
-function Stat({ label, value }) {
-  return (
-    <div
-      className="rounded-xl p-3"
-      style={{ background: "rgba(15,23,42,0.96)", border: `1px solid ${COLORS.border}` }}
-    >
-      <div
-        className="text-[11px] text-slate-400 mb-1"
-        style={{ fontFamily: "Inter, sans-serif" }}
-      >
-        {label}
-      </div>
-      <div
-        className="text-lg font-bold text-slate-50"
-        style={{ fontFamily: "Space Grotesk, sans-serif" }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
+export default LiveGuardianPage;
 

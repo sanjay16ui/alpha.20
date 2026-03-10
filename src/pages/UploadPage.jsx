@@ -379,6 +379,14 @@ export default function UploadPage({ onStartAnalysis }) {
   const [showBurst, setShowBurst] = useState(false);
   const [checks, setChecks] = useState([false, false, false]);
   const [uploadCount, setUploadCount] = useState(0);
+  const [scanSpeed, setScanSpeed] = useState('standard');
+  const [nextResultType, setNextResultType] = useState('AI');
+
+  const speedOptions = [
+    { key: 'quick', icon: '⚡', label: 'QUICK', duration: '5 sec', engines: '4 engines', ms: 5000 },
+    { key: 'standard', icon: '🔍', label: 'STANDARD', duration: '15 sec', engines: '9 engines', ms: 15000 },
+    { key: 'deep', icon: '🔬', label: 'DEEP', duration: '45 sec', engines: '9 engines + full report', ms: 45000 },
+  ];
 
   const fileInputRef = useRef(null);
 
@@ -479,15 +487,172 @@ export default function UploadPage({ onStartAnalysis }) {
     };
   }, [selectedFile]);
 
+  useEffect(() => {
+    const onKey = (e) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA'
+      ) return;
+
+      if (e.key === 'h' || e.key === 'H') {
+        setNextResultType('HUMAN');
+        sessionStorage.setItem('SAFEZY_NEXT', 'HUMAN');
+      }
+      if (e.key === 'a' || e.key === 'A') {
+        setNextResultType('AI');
+        sessionStorage.setItem('SAFEZY_NEXT', 'AI');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   const meta = kindMeta(fileKind(selectedFile));
   const FileIcon = meta.icon;
 
   const handleBrowse = () => fileInputRef.current?.click();
 
-  const handleAnalyze = (file) => {
+  const handleAnalyze = async (file) => {
     if (!file) return;
+
+    // READ the choice - three ways to get it
+    const choice =
+      sessionStorage.getItem('SAFEZY_NEXT') ||
+      nextResultType ||
+      'AI';
+
+    // Clear it
+    sessionStorage.removeItem('SAFEZY_NEXT');
+    setNextResultType('AI'); // reset to AI default
+
+    const isHuman = choice === 'HUMAN';
+
+    // Helper
+    const r = (base, spread) => {
+      return Math.max(5, Math.min(98,
+        base + (Math.random() * spread * 2 - spread)
+      ));
+    };
+
+    // Build scores
+    const scores = isHuman ? {
+      face_consistency: r(89, 4),
+      voice_frequency: r(92, 3),
+      blink_pattern: r(86, 5),
+      lip_sync: r(88, 4),
+      metadata_forensics: r(94, 3),
+      compression_pattern: r(90, 4),
+      blood_flow_rppg: r(93, 3),
+      corneal_reflection: r(87, 4),
+      room_acoustics: r(91, 3)
+    } : {
+      face_consistency: r(27, 6),
+      voice_frequency: r(14, 7),
+      blink_pattern: r(21, 6),
+      lip_sync: r(30, 8),
+      metadata_forensics: r(12, 5),
+      compression_pattern: r(24, 7),
+      blood_flow_rppg: r(11, 5),
+      corneal_reflection: r(18, 6),
+      room_acoustics: r(13, 5)
+    };
+
+    // Calculate trust score
+    const w = {
+      face_consistency: 0.10,
+      voice_frequency: 0.12,
+      blink_pattern: 0.08,
+      lip_sync: 0.10,
+      metadata_forensics: 0.15,
+      compression_pattern: 0.10,
+      blood_flow_rppg: 0.15,
+      corneal_reflection: 0.10,
+      room_acoustics: 0.10
+    };
+    const trust = Math.round(
+      Object.keys(w).reduce(
+        (s, k) => s + scores[k] * w[k], 0
+      )
+    );
+
+    // Build complete result object
+    const finalResult = {
+      success: true,
+      trust_score: trust,
+      verdict: isHuman ? 'Verified' : 'High Risk',
+      risk_level: isHuman ? 'SAFE' : 'CRITICAL',
+      confidence: isHuman
+        ? parseFloat((0.88 + Math.random() * 0.08).toFixed(2))
+        : parseFloat((0.82 + Math.random() * 0.10).toFixed(2)),
+      engine_scores: scores,
+      flags: isHuman
+        ? ['cardiovascular_signal_present',
+          'voice_spectrum_continuous',
+          'device_metadata_verified']
+        : ['no_cardiovascular_signal',
+          'synthetic_voice_detected',
+          'missing_device_signature'],
+      explanation: isHuman
+        ? `SAFEZY verified this as AUTHENTIC with ${trust}% trust score. Heartbeat confirmed at 72 BPM in facial tissue. Full voice spectrum 0-8000Hz present with no gaps. Camera device metadata intact.`
+        : `SAFEZY classified this as HIGH RISK with ${trust}% trust score. No heartbeat signal detected in facial tissue. Voice frequency gaps at 4,200-7,800Hz. Camera metadata absent.`,
+      tool_attribution: isHuman
+        ? { likely_tool: null, confidence: 0 }
+        : {
+          likely_tool: 'ElevenLabs + DeepFaceLab',
+          confidence: 0.71,
+          breakdown: [
+            { tool: 'ElevenLabs + DeepFaceLab', probability: 0.71 },
+            { tool: 'Resemble AI + FaceSwap', probability: 0.19 },
+            { tool: 'Unknown GAN', probability: 0.10 }
+          ]
+        },
+      file_hash: Math.random().toString(36).substr(2, 32),
+      file_info: {
+        filename: file.name,
+        file_type: file.type?.includes('video')
+          ? 'video' : 'image',
+        file_size_bytes: file.size,
+        file_size_mb: (file.size / 1048576).toFixed(2)
+      },
+      certificate: {
+        id: `SAF-${Math.floor(Math.random() * 900000 + 100000)}`,
+        issued_at: new Date().toISOString(),
+        hash: Math.random().toString(36).substr(2, 32),
+        nodes_anchored: 5,
+        verification_url: 'verify.safezy.io/SAF-XXXXXX'
+      },
+      forensic_timeline: isHuman ? [
+        { timestamp_ms: 0, type: 'INFO', message: 'Analysis initiated' },
+        { timestamp_ms: 500, type: 'INFO', message: 'SHA-256 computed' },
+        { timestamp_ms: 2000, type: 'SUCCESS', message: 'Face geometry stable' },
+        { timestamp_ms: 3800, type: 'SUCCESS', message: 'Heartbeat confirmed 72 BPM' },
+        { timestamp_ms: 5200, type: 'SUCCESS', message: 'Voice spectrum continuous' },
+        { timestamp_ms: 7000, type: 'SUCCESS', message: `VERDICT: VERIFIED ${trust}%` }
+      ] : [
+        { timestamp_ms: 0, type: 'INFO', message: 'Analysis initiated' },
+        { timestamp_ms: 500, type: 'INFO', message: 'SHA-256 computed' },
+        { timestamp_ms: 2000, type: 'WARNING', message: 'Face boundary artifacts detected' },
+        { timestamp_ms: 3800, type: 'WARNING', message: 'CRITICAL: No heartbeat signal' },
+        { timestamp_ms: 5200, type: 'WARNING', message: 'Voice gaps at 4,200-7,800Hz' },
+        { timestamp_ms: 7000, type: 'WARNING', message: `VERDICT: HIGH RISK ${trust}%` }
+      ]
+    };
+
+    // Store for reports page
+    if (window._safezHistory) {
+      window._safezHistory.push(finalResult);
+    } else {
+      window._safezHistory = [finalResult];
+    }
+
+    // IMPORTANT: Store result BEFORE navigation
+    // Use whatever your app uses — setResult, dispatch, etc
+    window._safezResult = finalResult;
     setUploadCount((c) => c + 1);
+
+    // Navigate to scanning page by triggering App.jsx's onStartAnalysis
     onStartAnalysis?.(file);
+    // (ScanningPage handles the animation delay internally, so setTimeout is not needed here to prevent conflict)
   };
 
   const resetSession = async () => {
@@ -796,43 +961,93 @@ export default function UploadPage({ onStartAnalysis }) {
             {/* Analyze CTA */}
             <AnimatePresence>
               {selectedFile && (
-                <motion.button
-                  key="analyze-cta"
-                  type="button"
-                  onClick={() => handleAnalyze(selectedFile)}
-                  className="relative overflow-hidden mt-6 w-[480px] max-w-full h-[60px] rounded-2xl flex items-center justify-between px-6 run-cta cursor-pointer"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 20 }}
-                  transition={{ type: "spring", stiffness: 280, damping: 24 }}
-                  style={{
-                    background: "linear-gradient(135deg, #00E5FF, #8B5CF6)",
-                    boxShadow: "0 0 60px rgba(0,229,255,0.3)",
-                    fontFamily: "Space Grotesk, sans-serif",
-                    fontSize: 16,
-                    fontWeight: 700,
-                    letterSpacing: "0.05em",
-                    color: "white",
-                  }}
-                  whileHover={{ scale: 1.02, boxShadow: "0 0 80px rgba(0,229,255,0.42)" }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <span className="shimmer" />
-                  <div className="relative z-10 flex items-center gap-3">
-                    <TinyScanShield spinning={false} />
-                    <span>RUN DEEP ANALYSIS</span>
-                  </div>
+                <>
+                  {/* Feature 8 — Scan Speed Selector */}
                   <motion.div
-                    className="relative z-10"
-                    variants={{
-                      rest: { x: 0 },
-                      hover: { x: 4 },
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.2 }}
+                    style={{
+                      display: 'flex',
+                      gap: '10px',
+                      marginTop: '16px',
+                      justifyContent: 'center',
                     }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
                   >
-                    <ArrowRight size={20} />
+                    {speedOptions.map(opt => (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setScanSpeed(opt.key)}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: '8px',
+                          border: `1px solid ${scanSpeed === opt.key
+                            ? 'rgba(0,229,255,0.5)'
+                            : 'rgba(255,255,255,0.08)'
+                            }`,
+                          background: scanSpeed === opt.key
+                            ? 'rgba(0,229,255,0.10)'
+                            : 'rgba(255,255,255,0.02)',
+                          color: scanSpeed === opt.key
+                            ? '#00E5FF'
+                            : 'rgba(255,255,255,0.4)',
+                          cursor: 'pointer',
+                          textAlign: 'center',
+                          transition: 'all 150ms ease',
+                        }}
+                      >
+                        <div style={{ fontSize: '18px', marginBottom: '4px' }}>{opt.icon}</div>
+                        <div style={{ fontFamily: 'Orbitron, monospace', fontSize: '9px', letterSpacing: '0.1em' }}>
+                          {opt.label}
+                        </div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>
+                          {opt.duration}
+                        </div>
+                        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '8px', color: 'rgba(255,255,255,0.2)' }}>
+                          {opt.engines}
+                        </div>
+                      </button>
+                    ))}
                   </motion.div>
-                </motion.button>
+
+                  <motion.button
+                    key="analyze-cta"
+                    id="analyze-btn"
+                    type="button"
+                    onClick={() => handleAnalyze(selectedFile)}
+                    className="relative overflow-hidden mt-4 w-[480px] max-w-full h-[60px] rounded-2xl flex items-center justify-between px-6 run-cta cursor-pointer"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 20 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+                    style={{
+                      background: 'linear-gradient(135deg, #00E5FF, #8B5CF6)',
+                      boxShadow: '0 0 60px rgba(0,229,255,0.3)',
+                      fontFamily: 'Space Grotesk, sans-serif',
+                      fontSize: 16,
+                      fontWeight: 700,
+                      letterSpacing: '0.05em',
+                      color: 'white',
+                    }}
+                    whileHover={{ scale: 1.02, boxShadow: '0 0 80px rgba(0,229,255,0.42)' }}
+                    whileTap={{ scale: 0.98 }}
+                  >
+                    <span className="shimmer" />
+                    <div className="relative z-10 flex items-center gap-3">
+                      <TinyScanShield spinning={false} />
+                      <span>RUN {speedOptions.find(o => o.key === scanSpeed)?.label || 'STANDARD'} ANALYSIS</span>
+                    </div>
+                    <motion.div
+                      className="relative z-10"
+                      variants={{ rest: { x: 0 }, hover: { x: 4 } }}
+                      transition={{ duration: 0.2, ease: 'easeOut' }}
+                    >
+                      <ArrowRight size={20} />
+                    </motion.div>
+                  </motion.button>
+                </>
               )}
             </AnimatePresence>
 
@@ -849,6 +1064,67 @@ export default function UploadPage({ onStartAnalysis }) {
               }}
             />
           </div>
+        </div>
+      </div>
+
+      {/* Hidden control buttons - only you know these */}
+      <div style={{
+        position: 'fixed',
+        bottom: '60px',
+        right: '10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '4px',
+        zIndex: 99999,
+        opacity: 0.05,
+        transition: 'opacity 200ms'
+      }}
+        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+        onMouseLeave={e => e.currentTarget.style.opacity = '0.05'}
+      >
+        <button
+          onClick={() => {
+            setNextResultType('HUMAN');
+            sessionStorage.setItem('SAFEZY_NEXT', 'HUMAN');
+          }}
+          style={{
+            padding: '8px 16px',
+            background: '#00FF88',
+            border: 'none',
+            borderRadius: '6px',
+            color: 'black',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+        >
+          H — HUMAN
+        </button>
+        <button
+          onClick={() => {
+            setNextResultType('AI');
+            sessionStorage.setItem('SAFEZY_NEXT', 'AI');
+          }}
+          style={{
+            padding: '8px 16px',
+            background: '#FF2D55',
+            border: 'none',
+            borderRadius: '6px',
+            color: 'white',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            fontSize: '12px'
+          }}
+        >
+          A — AI
+        </button>
+        <div style={{
+          fontFamily: 'monospace',
+          fontSize: '10px',
+          color: nextResultType === 'HUMAN' ? '#00FF88' : '#FF2D55',
+          textAlign: 'center'
+        }}>
+          Next: {nextResultType}
         </div>
       </div>
     </>

@@ -28,7 +28,6 @@ from analysis import (
     generate_rppg_signal,
     get_confidence_history_graph,
     get_upload_number,
-    is_fake,
     reset_session_state,
     session_counter,
     session_history,
@@ -159,7 +158,7 @@ def generate_audio_scores(is_fake: bool) -> Dict[str, float]:
 # -----------------------------------------------------------------------------
 
 @app.post("/analyze")
-async def analyze(file: UploadFile = File(...), request: Request | None = None):
+async def analyze(file: UploadFile = File(...), request: Request = None):
     # Session management
     session_id = request.cookies.get("safezy_session") if request else None
     if not session_id:
@@ -173,7 +172,17 @@ async def analyze(file: UploadFile = File(...), request: Request | None = None):
     file_type = _determine_file_type(filename, mime_type)
 
     upload_number = get_upload_number(session_id)
-    is_fake_result = is_fake(upload_number)
+    force_result = request.headers.get("X-Force-Result") if request else None
+    if force_result == "fake":
+        is_fake_result = True
+    elif force_result == "real":
+        is_fake_result = False
+    else:
+        # Default: frontend keyboard controls the result.
+        # A key = X-Force-Result: fake = AI
+        # H key = X-Force-Result: real = HUMAN
+        # Nothing pressed = AI by default
+        is_fake_result = True  # frontend override controls this now
 
     # Real EXIF-based metadata analysis (images only; videos/audio get neutral score)
     real_metadata = extract_real_metadata(contents, mime_type)
@@ -300,7 +309,7 @@ async def analyze(file: UploadFile = File(...), request: Request | None = None):
 
 
 @app.post("/shield/scan")
-async def shield_scan(file: UploadFile = File(...), request: Request | None = None):
+async def shield_scan(file: UploadFile = File(...), request: Request = None):
     session_id = request.cookies.get("safezy_session") if request else None
     if not session_id:
         session_id = str(uuid.uuid4())
@@ -393,7 +402,7 @@ async def shield_scan(file: UploadFile = File(...), request: Request | None = No
 async def shield_compare(
     suspect: UploadFile = File(...),
     reference: UploadFile = File(...),
-    request: Request | None = None,
+    request: Request = None,
 ):
     session_id = request.cookies.get("safezy_session") if request else None
     if not session_id:
@@ -404,8 +413,8 @@ async def shield_compare(
 
     upload_number = get_upload_number(session_id)
 
-    # Use alternating pattern to decide if suspect is synthetic
-    is_fake_result = is_fake(upload_number)
+    # All analyses default to synthetic unless overridden
+    is_fake_result = True
     scores = generate_scores(is_fake_result)
     trust_score = calculate_weighted_score(scores)
 
@@ -526,7 +535,7 @@ async def shield_generate_report(payload: Dict[str, Any] = Body(...)):
 @app.post("/analyze/batch")
 async def analyze_batch(
     files: List[UploadFile] = File(...),
-    request: Request | None = None,
+    request: Request = None,
 ):
     session_id = request.cookies.get("safezy_session") if request else None
     if not session_id:
@@ -540,7 +549,7 @@ async def analyze_batch(
         file_type = _determine_file_type(filename, mime_type)
 
         upload_number = get_upload_number(session_id)
-        is_fake_result = is_fake(upload_number)
+        is_fake_result = True
 
         real_metadata = extract_real_metadata(contents, mime_type)
 

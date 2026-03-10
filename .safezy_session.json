@@ -1,0 +1,65 @@
+{
+  "session_counter": {
+    "a5d99d24-2162-44c4-8288-f1a4b74ca306": 8
+  },
+  "session_history": {
+    "a5d99d24-2162-44c4-8288-f1a4b74ca306": [
+      {
+        "upload_number": 1,
+        "timestamp": "2026-03-10T22:41:47.582875",
+        "trust_score": 17.2,
+        "verdict": "High Risk",
+        "filename": "WhatsApp Image 2026-03-10 at 5.45.43 PM.jpeg",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 2,
+        "timestamp": "2026-03-10T22:42:25.961914",
+        "trust_score": 78.2,
+        "verdict": "Verified",
+        "filename": "SAFEZY_TruthScore_media_SAFEZY.png",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 3,
+        "timestamp": "2026-03-10T22:42:56.298420",
+        "trust_score": 19.7,
+        "verdict": "High Risk",
+        "filename": "WhatsApp Image 2026-03-10 at 5.45.43 PM.jpeg",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 5,
+        "timestamp": "2026-03-10T22:52:25.163348",
+        "trust_score": 18.9,
+        "verdict": "High Risk",
+        "filename": "WhatsApp Image 2026-03-10 at 5.45.43 PM.jpeg",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 6,
+        "timestamp": "2026-03-10T22:58:54.931586",
+        "trust_score": 19.2,
+        "verdict": "High Risk",
+        "filename": "WhatsApp Image 2026-03-10 at 5.45.43 PM.jpeg",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 7,
+        "timestamp": "2026-03-10T22:59:27.984943",
+        "trust_score": 20.5,
+        "verdict": "High Risk",
+        "filename": "SAFEZY_Certificate_SAF-628192.png",
+        "file_type": "image"
+      },
+      {
+        "upload_number": 8,
+        "timestamp": "2026-03-10T22:59:32.431015",
+        "trust_score": 20.0,
+        "verdict": "High Risk",
+        "filename": "SAFEZY_Certificate_SAF-628192.png",
+        "file_type": "image"
+      }
+    ]
+  }
+}

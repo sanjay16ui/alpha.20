@@ -239,7 +239,7 @@ const useCountUp = (end, duration = 1500, trigger = true) => {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // SIDEBAR
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const Sidebar = ({ currentPage, onNavigate }) => {
+const Sidebar = ({ currentPage, onNavigate, globalCounter }) => {
   const [mounted, setMounted] = useState(false);
   const { state } = useSafezyStore();
   useEffect(() => setMounted(true), []);
@@ -400,6 +400,17 @@ const Sidebar = ({ currentPage, onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {/* Feature 12 — Global Counter */}
+      {globalCounter && (
+        <div>
+          <div
+            className="mx-4 border-t border-white/5 my-2"
+            style={{ borderColor: "rgba(255,255,255,0.05)" }}
+          />
+          {globalCounter}
+        </div>
+      )}
 
       <div
         className="mx-4 border-t border-white/5 my-4"
@@ -657,6 +668,7 @@ export default function AppShell({
   onNewAnalysis,
   demoMode = false,
   statusBarOverride = null,
+  globalCounter = null,
   children,
 }) {
   const [backendConnected, setBackendConnected] = useState(false);
@@ -787,7 +799,7 @@ export default function AppShell({
         backendConnected={backendConnected}
       />
 
-      <Sidebar currentPage={currentPage} onNavigate={setPage} />
+      <Sidebar currentPage={currentPage} onNavigate={setPage} globalCounter={globalCounter} />
       <MobileTabBar currentPage={currentPage} onNavigate={setPage} />
 
       <main

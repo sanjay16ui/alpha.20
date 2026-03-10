@@ -35,40 +35,35 @@ export default function CertsPage() {
     verified: certs.filter((c) => c.verdict === "Verified").length,
   };
 
-  if (!certs.length) {
-    return (
-      <motion.div
-        variants={pageVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        className="min-h-[calc(100vh-84px)] flex items-center justify-center"
-      >
-        <div
-          className="rounded-2xl p-10 text-center max-w-md"
-          style={{ background: COLORS.surface, border: `1px solid ${COLORS.border}` }}
-        >
-          <div className="mb-4 flex justify-center">
-            <div
-              className="w-14 h-14 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(15,23,42,0.9)" }}
-            >
-              <Vault size={26} className="text-slate-400" />
-            </div>
-          </div>
-          <h2
-            className="text-xl font-bold mb-2"
-            style={{ fontFamily: "Space Grotesk", color: "white" }}
-          >
-            Your certificate vault is empty
-          </h2>
-          <p className="text-sm text-gray-400 mb-4" style={{ fontFamily: "Inter" }}>
-            Analyze a file to generate your first forensic certificate.
-          </p>
-        </div>
-      </motion.div>
-    );
-  }
+  const demoCerts =
+    certs.length > 0
+      ? []
+      : [
+          {
+            id: "SAF-248391",
+            filename: "ceo_press_clip.mp4",
+            verdict: "High Risk",
+            trust_score: 21,
+            certificate: {
+              id: "SAF-248391",
+              issued_at: new Date().toISOString(),
+              hash: "c4f8a13bc92e4a8f9a431b72c92e1a44",
+            },
+          },
+          {
+            id: "SAF-903712",
+            filename: "id_photo_selfie.jpg",
+            verdict: "Verified",
+            trust_score: 92,
+            certificate: {
+              id: "SAF-903712",
+              issued_at: new Date().toISOString(),
+              hash: "d7b0e51f2c98ab3471f0e7f3c5a0b921",
+            },
+          },
+        ];
+
+  const displayCerts = certs.length ? certs : demoCerts;
 
   return (
     <motion.div
@@ -93,7 +88,7 @@ export default function CertsPage() {
       </header>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {certs.map((a) => {
+        {displayCerts.map((a) => {
           const isHigh = a.verdict === "High Risk";
           const bandColor = isHigh ? "rgba(239,68,68,0.18)" : "rgba(16,185,129,0.18)";
           const borderColor = isHigh ? COLORS.red : COLORS.green;

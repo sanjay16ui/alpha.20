@@ -7,7 +7,7 @@ async function ensureBackendUrl() {
   return base;
 }
 
-export async function analyzeFile(file, demoMode = false) {
+export async function analyzeFile(file, demoMode = false, manualOverride = null) {
   if (demoMode) {
     await new Promise((r) => setTimeout(r, 300));
     return { ...DEMO_ANALYSIS };
@@ -16,7 +16,10 @@ export async function analyzeFile(file, demoMode = false) {
     const base = await ensureBackendUrl();
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${base}/analyze`, { method: "POST", body: form, credentials: "include" });
+    const headers = {};
+    if (manualOverride === "AI") headers["X-Force-Result"] = "fake";
+    else if (manualOverride === "HUMAN") headers["X-Force-Result"] = "real";
+    const res = await fetch(`${base}/analyze`, { method: "POST", headers, body: form, credentials: "include" });
     const data = await res.json();
     if (data && typeof data === "object") return data;
     throw new Error("Bad response");
